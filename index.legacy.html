@@ -413,17 +413,10 @@ function fmtDate(dateStr) {
 }
 function shortDay(dateStr) { return ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'][new Date(dateStr + 'T12:00:00').getDay()]; }
 function isToday(dateStr) { return new Date(dateStr + 'T12:00:00').toDateString() === new Date().toDateString(); }
-function esc(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 // ─── Config ───
 const LAT = 45.9237, LON = 6.8694;
+const METEOFRANCE_API_KEY = 'REDACTED_REMOVED';
 
 const SKI_AREAS = [
   { name: 'Aiguille du Midi', elev: 3842 },
@@ -483,7 +476,10 @@ async function fetchTempAt(elev) {
 // ─── BERA : API Météo-France ───
 async function fetchBERA() {
   try {
-    const res = await fetch('/api/bera');
+    const res = await fetch(
+      'https://public-api.meteofrance.fr/public/DPBRA/v1/massif/BRA?id-massif=3&format=xml',
+      { headers: { 'apikey': METEOFRANCE_API_KEY, 'accept': '*/*' } }
+    );
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const xmlText = await res.text();
     const parser = new DOMParser();
@@ -549,21 +545,17 @@ function renderBERA(bera) {
   const info = level ? BERA_LEVELS[level - 1] : null;
 
   if (level && info) {
-    const massifName = esc(bera.massif || 'Mont-Blanc');
-    const commentText = bera.commentaire
-      ? esc(bera.commentaire)
-      : (level >= 4
-        ? '⚠️ Prudence maximale requise. Déclenchements spontanés et par skieur très probables.'
-        : level >= 3
-          ? '⚠️ Risque marqué. Choix d\'itinéraire méticuleux nécessaire.'
-          : 'Consultez le bulletin complet pour les détails par versant et altitude.');
+    const massifName = bera.massif || 'Mont-Blanc';
     header.innerHTML = `
       <div class="bera-risk-badge bera-risk-${level}">${level}</div>
       <div class="bera-info">
         <div class="bera-massif">Massif du ${massifName} · Météo-France BERA${bera.source === 'api' ? ' · API en direct' : ''}</div>
         <div class="bera-level">Risque ${info.label} (${level}/5)</div>
         <div class="bera-summary">
-          ${commentText}
+          ${bera.commentaire ? bera.commentaire :
+            (level >= 4 ? '⚠️ Prudence maximale requise. Déclenchements spontanés et par skieur très probables.' :
+             level >= 3 ? '⚠️ Risque marqué. Choix d\'itinéraire méticuleux nécessaire.' :
+             'Consultez le bulletin complet pour les détails par versant et altitude.')}
         </div>
       </div>
     `;
@@ -589,15 +581,15 @@ function renderBERA(bera) {
     let detailsHTML = '';
 
     if (bera.risque1 != null && bera.risque2 != null && bera.altitude) {
-      const evol1 = bera.evolu1 ? ` <span class="evolves">→ ${esc(bera.evolu1)}</span>` : '';
-      const evol2 = bera.evolu2 ? ` <span class="evolves">→ ${esc(bera.evolu2)}</span>` : '';
+      const evol1 = bera.evolu1 ? ` <span class="evolves">→ ${bera.evolu1}</span>` : '';
+      const evol2 = bera.evolu2 ? ` <span class="evolves">→ ${bera.evolu2}</span>` : '';
       detailsHTML += `
         <div class="bera-detail-card">
-          <div class="bd-label">Risque en dessous de ${esc(bera.altitude)}m</div>
+          <div class="bd-label">Risque en dessous de ${bera.altitude}m</div>
           <div class="bd-value"><span class="risk-num">${bera.risque1}</span>/5${evol1}</div>
         </div>
         <div class="bera-detail-card">
-          <div class="bd-label">Risque au-dessus de ${esc(bera.altitude)}m</div>
+          <div class="bd-label">Risque au-dessus de ${bera.altitude}m</div>
           <div class="bd-value"><span class="risk-num">${bera.risque2}</span>/5${evol2}</div>
         </div>
       `;
@@ -788,11 +780,10 @@ async function init() {
     renderTemperatures(tempResults);
   } catch (err) {
     console.error(err);
-    const errMsg = esc(err && err.message ? err.message : 'Erreur inconnue');
     document.getElementById('loading').innerHTML = `
       <div class="error-box">
         <h3>Impossible de charger les données</h3>
-        <p>${errMsg}. Vérifiez votre connexion et rechargez la page.</p>
+        <p>${err.message}. Vérifiez votre connexion et rechargez la page.</p>
       </div>
     `;
   }

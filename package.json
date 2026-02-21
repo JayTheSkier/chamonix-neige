@@ -1,0 +1,9 @@
+{
+  "name": "chamonix-neige",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Secure local server for Chamonix Neige app",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
