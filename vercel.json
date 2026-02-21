@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/legacy",
+      "destination": "/index.legacy.html"
+    }
+  ]
+}
